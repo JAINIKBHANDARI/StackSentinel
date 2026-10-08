@@ -10,11 +10,26 @@ const deploymentRoutes = require('./routes/deploymentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+const connectDB = require('./config/db');
+const mongoose = require('mongoose');
 
 const app = express();
 
+// Auto-connect to MongoDB if disconnected (critical for serverless / cloud deployments)
+app.use(async (req, res, next) => {
+  if (process.env.NODE_ENV !== 'test' && mongoose.connection.readyState === 0) {
+    try {
+      await connectDB();
+    } catch (err) {
+      console.error('[DB Auto-Connect Error]', err.message);
+    }
+  }
+  next();
+});
+
 // Security HTTP headers
 app.use(helmet());
+
 
 // CORS configuration
 const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:5173';

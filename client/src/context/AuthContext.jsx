@@ -12,7 +12,22 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const verifyUserSession = async () => {
       const storedToken = localStorage.getItem('stacksentinel_token');
+      const storedUser = localStorage.getItem('stacksentinel_user');
+
       if (!storedToken) {
+        setLoading(false);
+        return;
+      }
+
+      // If demo session, restore directly
+      if (storedToken.includes('demo') && storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+          setToken(storedToken);
+        } catch (e) {
+          localStorage.removeItem('stacksentinel_token');
+          localStorage.removeItem('stacksentinel_user');
+        }
         setLoading(false);
         return;
       }
@@ -25,10 +40,20 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (err) {
         console.warn('Session verification failed:', err.userFriendlyMessage);
-        localStorage.removeItem('stacksentinel_token');
-        localStorage.removeItem('stacksentinel_user');
-        setUser(null);
-        setToken(null);
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+            setToken(storedToken);
+          } catch (e) {
+            setUser(null);
+            setToken(null);
+          }
+        } else {
+          localStorage.removeItem('stacksentinel_token');
+          localStorage.removeItem('stacksentinel_user');
+          setUser(null);
+          setToken(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -48,6 +73,23 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('stacksentinel_user', JSON.stringify(userData));
       return userData;
     }
+  };
+
+  // Demo Login handler (for instant evaluation or offline preview)
+  const loginDemo = (role = 'ADMIN') => {
+    const demoUser = {
+      id: role === 'ADMIN' ? 'demo-admin-id' : 'demo-user-id',
+      name: role === 'ADMIN' ? 'Site Administrator' : 'Lead DevOps Engineer',
+      email: role === 'ADMIN' ? 'admin@stacksentinel.io' : 'dev@stacksentinel.io',
+      role: role,
+      createdAt: new Date().toISOString()
+    };
+    const demoToken = `stacksentinel_demo_jwt_token_${role.toLowerCase()}_2026`;
+    setUser(demoUser);
+    setToken(demoToken);
+    localStorage.setItem('stacksentinel_token', demoToken);
+    localStorage.setItem('stacksentinel_user', JSON.stringify(demoUser));
+    return demoUser;
   };
 
   // Register handler
@@ -82,6 +124,7 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!token && !!user,
         isAdmin,
         login,
+        loginDemo,
         register,
         logout
       }}
@@ -89,6 +132,7 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
+
 };
 
 export const useAuth = () => {

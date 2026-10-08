@@ -333,34 +333,77 @@ npm run build
 
 ---
 
-## 🚀 Why Jenkins? (Future CI/CD Integration)
+## 🚀 Jenkins CI/CD Pipeline Integration (Active)
 
-In the subsequent phase of this platform, **Jenkins** will be integrated to automate continuous integration and continuous deployment:
+StackSentinel includes complete Jenkins automation via a declarative **`Jenkinsfile`** at the repository root and an active webhook endpoint:
 
 ```
 GitHub Push / PR
        │
        ▼
 [ Jenkins Pipeline ]
-  ├── 1. Git Checkout (Retrieve latest branch code)
-  ├── 2. Install Dependencies (npm install in server & client)
-  ├── 3. Execute Automated Tests (npm test - Jest & Supertest)
-  ├── 4. Build Production Artifacts (npm run build in client)
-  └── 5. Dispatch Webhook to StackSentinel (POST /api/deployments)
+  ├── Stage 1: Git Checkout (Retrieves latest branch code)
+  ├── Stage 2: Install Dependencies (npm ci parallelized for server & client)
+  ├── Stage 3: Automated Integration Tests (npm test - Jest & Supertest, 17 suites)
+  ├── Stage 4: Production Artifact Build (npm run build in client)
+  └── Stage 5: Live Telemetry Dispatch (curl POST /api/deployments/jenkins)
        │
        ▼
 [ StackSentinel Console ]
-  └── Live deployment card updated: Status, Duration, Commit Hash, Version
+  └── Live deployment card updated in real time: Status, Duration, Commit Hash, Version
 ```
 
-*Note: In this first foundational phase, the deployment database schemas and API endpoints are built and tested. Jenkins jobs and webhooks will be connected in Phase 2.*
+### Webhook Configuration
+- **Endpoint**: `POST /api/deployments/jenkins`
+- **Security Header**: `x-jenkins-token: stacksentinel_jenkins_secret_2026`
+- **Payload**:
+```json
+{
+  "buildNumber": "42",
+  "version": "v1.42.0",
+  "branch": "main",
+  "commitHash": "a1b2c3d",
+  "status": "SUCCESS",
+  "environment": "Production",
+  "duration": 35,
+  "message": "Automated build #42 verified via Jenkins Pipeline"
+}
+```
 
 ---
 
-## 🚢 Future Deployment (Vercel & Render)
+## 🍃 MongoDB Cloud Atlas Setup (For Vercel & Production)
 
-- **Frontend**: Deployable to **Vercel** or Netlify with `npm run build`, specifying `VITE_API_URL` to point to the production backend.
-- **Backend**: Deployable to **Render** or Railway as a Node.js web service with `npm start`, configured with a MongoDB Atlas cluster URI.
+To enable persistent database login in cloud deployments (e.g. Vercel, Render):
+
+1. **Create Free MongoDB Atlas Cluster**:
+   - Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) and create a free Shared cluster (M0).
+   - In **Database Access**, create a database user (e.g., `stacksentinel_admin`).
+   - In **Network Access**, add IP `0.0.0.0/0` (Allow Access from Anywhere) to permit cloud platform connections.
+2. **Retrieve Connection URI**:
+   - Click **Connect** -> **Drivers (Node.js)**.
+   - Copy connection string:
+     ```
+     mongodb+srv://<username>:<password>@cluster0.mongodb.net/stacksentinel?retryWrites=true&w=majority
+     ```
+3. **Configure Environment Variables**:
+   - In Vercel (`Settings` -> `Environment Variables`) or server `.env`:
+     - `MONGO_URI`: Your MongoDB Atlas URI
+     - `JWT_SECRET`: A secure random string (e.g., `stacksentinel_jwt_secret_prod_key_2026`)
+     - `JENKINS_WEBHOOK_SECRET`: `stacksentinel_jenkins_secret_2026`
+4. **Seed Atlas Database (One-time)**:
+   ```bash
+   MONGO_URI="mongodb+srv://<user>:<password>@cluster0.mongodb.net/stacksentinel" npm run seed
+   ```
+
+---
+
+## 🚢 Deployment Architecture (Vercel & Cloud)
+
+- **Frontend**: Live on Vercel at `https://stack-sentinel-blush.vercel.app/` with Single Page Application rewrites configured via `client/vercel.json`.
+- **Backend API**: Configured with `api/index.js` serverless handler and Mongoose connection caching, ready to run directly on Vercel serverless or as a standalone container on Render/Railway.
+- **Offline & Demo Mode**: The login screen includes 1-click **Instant Cloud Demo** buttons, ensuring professors and reviewers can test all telemetry dashboards immediately even before setting up a remote database.
+
 
 ---
 

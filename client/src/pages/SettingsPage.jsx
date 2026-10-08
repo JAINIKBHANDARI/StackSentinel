@@ -13,7 +13,10 @@ const SettingsPage = () => {
   const [requestTimeout, setRequestTimeout] = useState('6000');
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [jenkinsSecret, setJenkinsSecret] = useState('stacksentinel_jenkins_secret_2026');
+  const [jenkinsServerUrl, setJenkinsServerUrl] = useState('');
   const [saving, setSaving] = useState(false);
+
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -112,18 +115,57 @@ const SettingsPage = () => {
           </div>
         </div>
 
+        {/* Jenkins CI/CD Automation Webhook */}
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div className="card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Terminal size={18} color="var(--brand-primary-light)" />
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Jenkins CI/CD Pipeline Webhook
+              </h3>
+            </div>
+            <span style={{ fontSize: '0.72rem', background: 'var(--status-up-bg)', color: 'var(--status-up)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--status-up-border)', fontWeight: 600 }}>
+              Enabled
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <Input
+              label="Jenkins Webhook Secret Token"
+              type="text"
+              value={jenkinsSecret}
+              onChange={(e) => setJenkinsSecret(e.target.value)}
+              helper="Expected in the 'x-jenkins-token' HTTP request header"
+            />
+
+            <Input
+              label="Jenkins Server URL (Optional)"
+              type="text"
+              placeholder="http://jenkins.internal:8080"
+              value={jenkinsServerUrl}
+              onChange={(e) => setJenkinsServerUrl(e.target.value)}
+              helper="Base URL to link build numbers directly to your Jenkins console"
+            />
+          </div>
+
+          <div style={{ background: 'rgba(0,0,0,0.25)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+            Pipeline Target: <code style={{ color: '#38bdf8' }}>POST /api/deployments/jenkins</code> — Automated builds in your <code style={{ color: '#f8fafc' }}>Jenkinsfile</code> dispatch test suites and bundle builds directly to StackSentinel.
+          </div>
+        </div>
+
         {/* Architecture Specs */}
         <div className="card" style={{ marginBottom: '1.5rem', background: 'rgba(11, 15, 23, 0.4)' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
             System Environment Architecture
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            <div>Frontend: <strong>React 18 + Vite</strong></div>
-            <div>Backend: <strong>Express + Node.js</strong></div>
-            <div>Database: <strong>MongoDB Atlas / Mongoose</strong></div>
-            <div>CI/CD Schema: <strong>Jenkins Automation Ready</strong></div>
+            <div>Frontend: <strong>React 18 + Vite (Vercel)</strong></div>
+            <div>Backend: <strong>Express + Node.js (Vercel / Render)</strong></div>
+            <div>Database: <strong>MongoDB Atlas (Mongoose ODM)</strong></div>
+            <div>CI/CD Pipeline: <strong>Jenkins Declarative Pipeline (Active)</strong></div>
           </div>
         </div>
+
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button type="submit" variant="primary" icon={Save} loading={saving}>

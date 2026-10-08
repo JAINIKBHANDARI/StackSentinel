@@ -141,9 +141,91 @@ const updateDeploymentStatus = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Record CI/CD deployment from Jenkins pipeline webhook
+ * @route   POST /api/deployments/jenkins
+ * @access  Public (Protected via x-jenkins-token)
+ */
+const recordJenkinsDeployment = async (req, res, next) => {
+  try {
+    const jenkinsToken = req.headers['x-jenkins-token'] || req.query.token;
+    const expectedToken = process.env.JENKINS_WEBHOOK_SECRET || 'stacksentinel_jenkins_secret_2026';
+
+    if (!jenkinsToken || jenkinsToken !== expectedToken) {
+      return errorResponse(res, 401, 'Unauthorized: Invalid or missing Jenkins webhook token (x-jenkins-token)');
+    }
+
+    const {
+      serviceName,
+      serviceId,
+      buildNumber,
+      version,
+      branch,
+      commitHash,
+      environment,
+      status,
+      duration,
+      message,
+      buildUrl
+    } = req.body;
+
+    // Find target service
+    let targetService = null;
+    if (serviceId) {
+      targetService = await Service.findById(serviceId);
+    } else if (serviceName) {
+      targetService = await Service.findOne({ name: new RegExp(serviceName, 'i') });
+    }
+
+    if (!targetService) {
+      targetService = await Service.findOne({});
+    }
+
+    if (!targetService) {
+      targetService = await Service.create({
+        name: 'StackSentinel Production Stack',
+        description: 'Primary production workload monitored by Jenkins CI/CD',
+        url: 'https://stack-sentinel-blush.vercel.app',
+        environment: environment || 'Production',
+        category: 'Backend',
+        expectedStatusCode: 200,
+        status: status === 'SUCCESS' ? 'UP' : status === 'FAILED' ? 'DOWN' : 'UNKNOWN'
+      });
+    }
+
+    const buildStatus = ['SUCCESS', 'FAILED', 'RUNNING', 'QUEUED', 'CANCELLED'].includes((status || '').toUpperCase())
+      ? status.toUpperCase()
+      : 'SUCCESS';
+
+    const releaseVersion = version || (buildNumber ? `v1.${buildNumber}.0` : `v1.0.${Date.now().toString().slice(-4)}`);
+
+    const deployment = await Deployment.create({
+      service: targetService._id,
+      version: releaseVersion,
+      branch: branch || 'main',
+      commitHash: commitHash || (process.env.GIT_COMMIT ? process.env.GIT_COMMIT.substring(0, 7) : 'jenkins-build'),
+      environment: environment || targetService.environment || 'Production',
+      status: buildStatus,
+      triggeredBy: buildUrl ? `Jenkins Build #${buildNumber || '1'}` : `Jenkins CI/CD Pipeline`,
+      startedAt: new Date(Date.now() - (duration ? duration * 1000 : 30000)),
+      completedAt: ['SUCCESS', 'FAILED', 'CANCELLED'].includes(buildStatus) ? new Date() : null,
+      duration: duration || Math.floor(Math.random() * 25) + 15,
+      message: message || `Jenkins CI/CD Build #${buildNumber || '1'} executed successfully on branch ${branch || 'main'}`
+    });
+
+    const populated = await Deployment.findById(deployment._id).populate('service', 'name environment category');
+
+    return successResponse(res, 201, 'Jenkins deployment telemetry recorded successfully', populated);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDeployments,
   getDeploymentById,
   createDeployment,
-  updateDeploymentStatus
+  updateDeploymentStatus,
+  recordJenkinsDeployment
 };
+

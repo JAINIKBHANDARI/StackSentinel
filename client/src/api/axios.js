@@ -1,12 +1,24 @@
 import axios from 'axios';
 
+const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // When running in production / HTTPS (like Vercel), default to relative /api to avoid mixed content
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    return '/api';
+  }
+  return '/api'; // Use Vite proxy on local dev and relative in prod
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: getBaseUrl(),
   headers: {
     'Content-Type': 'application/json'
   },
   timeout: 10000
 });
+
 
 // Request interceptor: attach JWT bearer token if available
 api.interceptors.request.use(

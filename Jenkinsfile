@@ -8,12 +8,16 @@ pipeline {
     environment {
         CI = 'true'
         NODE_ENV = 'test'
+        STACKSENTINEL_API_URL = credentials('STACKSENTINEL_API_URL') ?: 'https://stack-sentinel-blush.vercel.app/api'
+        STACKSENTINEL_WEBHOOK_SECRET = credentials('STACKSENTINEL_WEBHOOK_SECRET') ?: 'stacksentinel_jenkins_secret_2026'
     }
 
     stages {
         stage('1. Checkout SCM') {
             steps {
-                echo 'Checking out source code from GitHub...'
+                echo '=================================================='
+                echo ' 1. Checking out source code from GitHub Repository'
+                echo '=================================================='
                 checkout scm
             }
         }
@@ -23,16 +27,28 @@ pipeline {
                 stage('Server Dependencies') {
                     steps {
                         dir('server') {
-                            echo 'Installing Server dependencies...'
-                            bat 'npm ci || npm install'
+                            echo 'Installing Backend Server dependencies...'
+                            script {
+                                if (isUnix()) {
+                                    sh 'npm ci || npm install'
+                                } else {
+                                    bat 'npm ci || npm install'
+                                }
+                            }
                         }
                     }
                 }
                 stage('Client Dependencies') {
                     steps {
                         dir('client') {
-                            echo 'Installing Client dependencies...'
-                            bat 'npm ci || npm install'
+                            echo 'Installing Frontend Client dependencies...'
+                            script {
+                                if (isUnix()) {
+                                    sh 'npm ci || npm install'
+                                } else {
+                                    bat 'npm ci || npm install'
+                                }
+                            }
                         }
                     }
                 }
@@ -42,8 +58,14 @@ pipeline {
         stage('3. Run Backend Integration Tests') {
             steps {
                 dir('server') {
-                    echo 'Running Jest + Supertest test suites...'
-                    bat 'npm test'
+                    echo 'Running Jest + Supertest automated test suites...'
+                    script {
+                        if (isUnix()) {
+                            sh 'npm test'
+                        } else {
+                            bat 'npm test'
+                        }
+                    }
                 }
             }
         }
@@ -52,17 +74,44 @@ pipeline {
             steps {
                 dir('client') {
                     echo 'Building Vite production bundle...'
-                    bat 'npm run build'
+                    script {
+                        if (isUnix()) {
+                            sh 'npm run build'
+                        } else {
+                            bat 'npm run build'
+                        }
+                    }
                 }
             }
         }
 
         stage('5. Record Deployment to StackSentinel') {
             steps {
-                echo 'Recording CI/CD pipeline results into StackSentinel...'
-                // If StackSentinel backend URL is configured, report the build outcome
+                echo 'Recording CI/CD build deployment telemetry to StackSentinel...'
                 script {
-                    echo "Build ${env.BUILD_NUMBER} completed for commit ${env.GIT_COMMIT ?: 'local'} on branch ${env.BRANCH_NAME ?: 'main'}"
+                    def apiUrl = env.STACKSENTINEL_API_URL ?: 'https://stack-sentinel-blush.vercel.app/api'
+                    def webhookToken = env.STACKSENTINEL_WEBHOOK_SECRET ?: 'stacksentinel_jenkins_secret_2026'
+                    def buildNum = env.BUILD_NUMBER ?: '1'
+                    def gitCommit = env.GIT_COMMIT ?: 'local-build'
+                    def gitBranch = env.BRANCH_NAME ?: 'main'
+
+                    echo "Dispatching deployment telemetry to: ${apiUrl}/deployments/jenkins"
+
+                    if (isUnix()) {
+                        sh """
+                            curl -s -X POST "${apiUrl}/deployments/jenkins" \
+                              -H "Content-Type: application/json" \
+                              -H "x-jenkins-token: ${webhookToken}" \
+                              -d '{"buildNumber":"${buildNum}","version":"v1.${buildNum}.0","branch":"${gitBranch}","commitHash":"${gitCommit}","status":"SUCCESS","environment":"Production","message":"Automated build #${buildNum} via Jenkins Pipeline completed successfully."}' || true
+                        """
+                    } else {
+                        bat """
+                            curl -s -X POST "${apiUrl}/deployments/jenkins" ^
+                              -H "Content-Type: application/json" ^
+                              -H "x-jenkins-token: ${webhookToken}" ^
+                              -d "{\\"buildNumber\\":\\"${buildNum}\\",\\"version\\":\\"v1.${buildNum}.0\\",\\"branch\\":\\"${gitBranch}\\",\\"commitHash\\":\\"${gitCommit}\\",\\"status\\":\\"SUCCESS\\",\\"environment\\":\\"Production\\",\\"message\\":\\"Automated build #${buildNum} via Jenkins Pipeline completed successfully.\\"}" || exit 0
+                        """
+                    }
                 }
             }
         }
@@ -75,14 +124,37 @@ pipeline {
         success {
             echo '=================================================='
             echo ' StackSentinel CI/CD Pipeline SUCCEEDED'
-            echo ' All tests passed and production build is verified'
+            echo ' All test suites passed and production bundle is verified'
             echo '=================================================='
         }
         failure {
             echo '=================================================='
             echo ' StackSentinel CI/CD Pipeline FAILED'
-            echo ' Check test logs or build errors above'
+            echo ' Notifying StackSentinel telemetry console...'
             echo '=================================================='
+            script {
+                def apiUrl = env.STACKSENTINEL_API_URL ?: 'https://stack-sentinel-blush.vercel.app/api'
+                def webhookToken = env.STACKSENTINEL_WEBHOOK_SECRET ?: 'stacksentinel_jenkins_secret_2026'
+                def buildNum = env.BUILD_NUMBER ?: '1'
+                def gitCommit = env.GIT_COMMIT ?: 'failed-build'
+                def gitBranch = env.BRANCH_NAME ?: 'main'
+
+                if (isUnix()) {
+                    sh """
+                        curl -s -X POST "${apiUrl}/deployments/jenkins" \
+                          -H "Content-Type: application/json" \
+                          -H "x-jenkins-token: ${webhookToken}" \
+                          -d '{"buildNumber":"${buildNum}","version":"v1.${buildNum}.0","branch":"${gitBranch}","commitHash":"${gitCommit}","status":"FAILED","environment":"Production","message":"Build #${buildNum} failed during CI verification."}' || true
+                    """
+                } else {
+                    bat """
+                        curl -s -X POST "${apiUrl}/deployments/jenkins" ^
+                          -H "Content-Type: application/json" ^
+                          -H "x-jenkins-token: ${webhookToken}" ^
+                          -d "{\\"buildNumber\\":\\"${buildNum}\\",\\"version\\":\\"v1.${buildNum}.0\\",\\"branch\\":\\"${gitBranch}\\",\\"commitHash\\":\\"${gitCommit}\\",\\"status\\":\\"FAILED\\",\\"environment\\":\\"Production\\",\\"message\\":\\"Build #${buildNum} failed during CI verification.\\"}" || exit 0
+                    """
+                }
+            }
         }
     }
 }

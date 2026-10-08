@@ -12,7 +12,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const { login } = useAuth();
+  const { login, loginDemo } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -142,7 +142,7 @@ const LoginPage = () => {
           </Button>
         </form>
 
-        {/* Demo Credentials Quick-Fill */}
+        {/* Demo Credentials & Instant Cloud Preview */}
         <div
           style={{
             marginTop: '1.5rem',
@@ -150,31 +150,64 @@ const LoginPage = () => {
             borderTop: '1px solid var(--border-subtle)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.65rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>
-            <Sparkles size={13} color="var(--brand-primary-light)" />
-            <span>Quick Demo Accounts (Seed Data)</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>
+              <Sparkles size={13} color="var(--brand-primary-light)" />
+              <span>Instant Cloud Demo (No Setup Needed)</span>
+            </div>
+            <span style={{ fontSize: '0.72rem', color: 'var(--status-up)', background: 'var(--status-up-bg)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--status-up-border)' }}>
+              Live Vercel Preview
+            </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
             <button
               type="button"
-              onClick={() => populateDemo('ADMIN')}
+              onClick={() => {
+                loginDemo('ADMIN');
+                addToast('Signed in as Administrator (Demo Mode)', 'success');
+                navigate('/dashboard', { replace: true });
+              }}
               className="btn btn-secondary btn-sm"
-              style={{ fontSize: '0.78rem', justifyContent: 'center' }}
+              style={{ fontSize: '0.78rem', justifyContent: 'center', borderColor: 'rgba(59, 130, 246, 0.4)' }}
             >
-              Fill Admin
+              ⚡ Instant Admin
             </button>
             <button
               type="button"
-              onClick={() => populateDemo('USER')}
+              onClick={() => {
+                loginDemo('USER');
+                addToast('Signed in as Developer (Demo Mode)', 'success');
+                navigate('/dashboard', { replace: true });
+              }}
               className="btn btn-secondary btn-sm"
               style={{ fontSize: '0.78rem', justifyContent: 'center' }}
             >
-              Fill Developer
+              ⚡ Instant Developer
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.73rem' }}>
+            <span>Auto-fill MongoDB Seed Credentials:</span>
+            <button
+              type="button"
+              onClick={() => populateDemo('ADMIN')}
+              style={{ background: 'none', border: 'none', color: 'var(--brand-primary-light)', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontSize: '0.73rem' }}
+            >
+              Admin
+            </button>
+            <span>/</span>
+            <button
+              type="button"
+              onClick={() => populateDemo('USER')}
+              style={{ background: 'none', border: 'none', color: 'var(--brand-primary-light)', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontSize: '0.73rem' }}
+            >
+              Dev
             </button>
           </div>
         </div>
 
-        <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+        <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
           Don't have an account?{' '}
           <Link to="/register" style={{ color: 'var(--brand-primary-light)', fontWeight: 600 }}>
             Create Account
@@ -184,5 +217,6 @@ const LoginPage = () => {
     </div>
   );
 };
+
 
 export default LoginPage;

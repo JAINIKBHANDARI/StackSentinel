@@ -213,4 +213,67 @@ describe('StackSentinel Core API Test Suite', () => {
       expect(res.body.data.totalServices).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe('5. CI/CD Deployments & Jenkins Webhook Integration', () => {
+    it('POST /api/deployments/jenkins - fails without webhook token (401)', async () => {
+      const res = await request(app)
+        .post('/api/deployments/jenkins')
+        .send({
+          buildNumber: '1',
+          version: 'v1.0.0',
+          branch: 'main'
+        });
+
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('Invalid or missing Jenkins webhook token');
+    });
+
+    it('POST /api/deployments/jenkins - fails with incorrect webhook token (401)', async () => {
+      const res = await request(app)
+        .post('/api/deployments/jenkins')
+        .set('x-jenkins-token', 'wrong_secret_token')
+        .send({
+          buildNumber: '1',
+          version: 'v1.0.0',
+          branch: 'main'
+        });
+
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('POST /api/deployments/jenkins - succeeds with valid x-jenkins-token (201)', async () => {
+      const res = await request(app)
+        .post('/api/deployments/jenkins')
+        .set('x-jenkins-token', process.env.JENKINS_WEBHOOK_SECRET || 'stacksentinel_jenkins_secret_2026')
+        .send({
+          buildNumber: '42',
+          version: 'v1.42.0',
+          branch: 'main',
+          commitHash: 'a1b2c3d',
+          status: 'SUCCESS',
+          environment: 'Production',
+          duration: 38,
+          message: 'Automated build #42 verified via Jenkins CI/CD'
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.version).toBe('v1.42.0');
+      expect(res.body.data.status).toBe('SUCCESS');
+      expect(res.body.data.triggeredBy).toContain('Jenkins');
+    });
+
+    it('GET /api/deployments - authenticated user retrieves deployments list', async () => {
+      const res = await request(app)
+        .get('/api/deployments')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+    });
+  });
 });
+
