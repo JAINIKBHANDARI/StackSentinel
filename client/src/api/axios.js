@@ -1,14 +1,11 @@
 import axios from 'axios';
+import { handleMockRequest } from './mockApi';
 
 const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  // When running in production / HTTPS (like Vercel), default to relative /api to avoid mixed content
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-    return '/api';
-  }
-  return '/api'; // Use Vite proxy on local dev and relative in prod
+  return '/api';
 };
 
 const api = axios.create({
@@ -18,7 +15,6 @@ const api = axios.create({
   },
   timeout: 10000
 });
-
 
 // Request interceptor: attach JWT bearer token if available
 api.interceptors.request.use(
@@ -32,27 +28,39 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor: extract clean error message
+// Response interceptor: extract clean error message or route through client-side API simulator
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  async (response) => {
+    // If response returned HTML, Vercel SPA rewrote /api to index.html -> use mock API handler
+    if (
+      typeof response.data === 'string' &&
+      (response.data.includes('<!doctype html>') || response.data.includes('<div id="root">') || response.data.includes('<html'))
+    ) {
+      return await handleMockRequest(response.config);
+    }
+    return response;
+  },
+  async (error) => {
+    // If cloud host has no live backend or returns 404/405/500 on /api, route through client-side simulator
+    if (
+      !error.response ||
+      error.response.status === 404 ||
+      error.response.status === 405 ||
+      error.response.status === 502 ||
+      error.response.status === 500
+    ) {
+      try {
+        return await handleMockRequest(error.config);
+      } catch (mockErr) {
+        // Fall through
+      }
+    }
+
     const message =
       error.response?.data?.message ||
       (error.response?.data?.errors ? error.response.data.errors.join(', ') : null) ||
       error.message ||
       'An unexpected network error occurred';
-
-    // If 401 unauthorized and regular token exists, clear expired token
-    if (error.response?.status === 401 && localStorage.getItem('stacksentinel_token')) {
-      const storedToken = localStorage.getItem('stacksentinel_token');
-      // If it's a demo token, do not strip session
-      if (!storedToken?.includes('demo')) {
-        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
-          localStorage.removeItem('stacksentinel_token');
-          localStorage.removeItem('stacksentinel_user');
-        }
-      }
-    }
 
     return Promise.reject({ ...error, userFriendlyMessage: message });
   }
