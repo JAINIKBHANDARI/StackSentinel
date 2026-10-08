@@ -42,12 +42,15 @@ api.interceptors.response.use(
       error.message ||
       'An unexpected network error occurred';
 
-    // If 401 unauthorized and token exists, clear expired token
+    // If 401 unauthorized and regular token exists, clear expired token
     if (error.response?.status === 401 && localStorage.getItem('stacksentinel_token')) {
-      // Don't auto-redirect on login or register check
-      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
-        localStorage.removeItem('stacksentinel_token');
-        localStorage.removeItem('stacksentinel_user');
+      const storedToken = localStorage.getItem('stacksentinel_token');
+      // If it's a demo token, do not strip session
+      if (!storedToken?.includes('demo')) {
+        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+          localStorage.removeItem('stacksentinel_token');
+          localStorage.removeItem('stacksentinel_user');
+        }
       }
     }
 
